@@ -33,10 +33,6 @@ function M:entry(job)
 
     local cwd, selected = state()
 
-    -- Capture the active tab NOW: ya.sync works at entry top, but the same
-    -- call dies silently after the fzf child has run (see cancel branch).
-    local my_idx = ya.sync(function() return cx.tabs.idx end)()
-
     if cwd.spec and cwd.spec.is_virtual then
         return ya.notify({
             title = 'Fzf',
@@ -59,13 +55,9 @@ function M:entry(job)
 
     local urls = M.split_urls(cwd, output)
     if #urls == 0 then
-        -- canceled: close the tab this search opened. tab_close takes a
-        -- 0-based index (core no-ops when fewer than 2 tabs exist).
-        -- NOTE: do NOT call ya.sync here — it dies silently after the fzf
-        -- child ran; use the idx captured at entry top instead.
-        if my_idx then
-            ya.emit('tab_close', { my_idx - 1 })
-        end
+        -- canceled: nothing to close yet (closing needs the active tab's
+        -- index, and cx.tabs is unreadable in this entry runtime — reading
+        -- it kills the whole entry, fzf never opens).
     elseif #urls == 1 then
         local cha = #selected == 0 and fs.cha(urls[1])
         ya.emit(cha and cha.is_dir and 'cd' or 'reveal', { urls[1] })

@@ -33,6 +33,10 @@ function M:entry(job)
 
     local cwd, selected = state()
 
+    -- Searches always start at ~ (never the current pane). Picks open their
+    -- own tabs, so the current tab is never touched.
+    cwd = Url(os.getenv('HOME') or tostring(cwd))
+
     if cwd.spec and cwd.spec.is_virtual then
         return ya.notify({
             title = 'Fzf',
@@ -55,12 +59,23 @@ function M:entry(job)
 
     local urls = M.split_urls(cwd, output)
     if #urls == 0 then
-        -- canceled: nothing to close yet (closing needs the active tab's
-        -- index, and cx.tabs is unreadable in this entry runtime — reading
-        -- it kills the whole entry, fzf never opens).
+        -- canceled: nothing was created, nothing to clean up.
     elseif #urls == 1 then
+        -- Open the pick in a FRESH tab at its location (tab_create switches
+        -- to it, so the follow-up reveal lands in the new tab).
+        local target = tostring(urls[1])
         local cha = #selected == 0 and fs.cha(urls[1])
-        ya.emit(cha and cha.is_dir and 'cd' or 'reveal', { urls[1] })
+        if cha and cha.is_dir then
+            ya.emit('tab_create', { target })
+        else
+            local dir = target:match('^(.*)/[^/]*$')
+            if dir and dir ~= '' then
+                ya.emit('tab_create', { dir })
+                ya.emit('reveal', { urls[1] })
+            else
+                ya.emit('reveal', { urls[1] })
+            end
+        end
     elseif #urls > 1 then
         urls.state = #selected > 0 and 'off' or 'on'
         ya.emit('toggle_all', urls)

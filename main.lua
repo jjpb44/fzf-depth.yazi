@@ -54,10 +54,12 @@ function M:entry(job)
 
     local urls = M.split_urls(cwd, output)
     if #urls == 0 then
-        -- canceled: close the tab this search opened (only ever >1 here)
-        local n = ya.sync(function() return #cx.tabs end)()
-        if n and n > 1 then
-            ya.emit('tab_close', { 0 })
+        -- canceled: close the tab this search opened (the active one).
+        -- tab_close takes a 0-based index (len<2 is a safe no-op in core),
+        -- and cx.tabs.idx is the 1-based active tab.
+        local i = ya.sync(function() return cx.tabs.idx end)()
+        if i then
+            ya.emit('tab_close', { i - 1 })
         end
     elseif #urls == 1 then
         local cha = #selected == 0 and fs.cha(urls[1])

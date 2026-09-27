@@ -32,7 +32,7 @@ function M:entry(job)
     ya.emit('escape', { visual = true })
 
     local cwd, selected = state()
-    if cwd.scheme and cwd.scheme.is_virtual then
+    if cwd.spec and cwd.spec.is_virtual then
         return ya.notify({
             title = 'Fzf',
             content = 'Not supported under virtual filesystems',
@@ -53,7 +53,13 @@ function M:entry(job)
     end
 
     local urls = M.split_urls(cwd, output)
-    if #urls == 1 then
+    if #urls == 0 then
+        -- canceled: close the tab this search opened (only ever >1 here)
+        local n = ya.sync(function() return #cx.tabs end)()
+        if n and n > 1 then
+            ya.emit('tab_close', { 0 })
+        end
+    elseif #urls == 1 then
         local cha = #selected == 0 and fs.cha(urls[1])
         ya.emit(cha and cha.is_dir and 'cd' or 'reveal', { urls[1] })
     elseif #urls > 1 then
@@ -64,7 +70,9 @@ end
 
 function M.run_with(cwd, selected)
     local child, err = Command('fzf')
-        :arg('-m')
+        :arg({ '-m', '--header', 'C-h: hidden files',
+            '--bind', 'ctrl-h:reload(fd --type f --absolute-path --hidden)' })
+        :env('FZF_DEFAULT_COMMAND', 'fd --type f --absolute-path')
         :cwd(tostring(cwd))
         :stdin(#selected > 0 and Command.PIPED or Command.INHERIT)
         :stdout(Command.PIPED)
